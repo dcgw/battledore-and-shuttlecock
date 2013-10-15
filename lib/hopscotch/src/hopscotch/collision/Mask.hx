@@ -8,7 +8,7 @@ import hopscotch.errors.NotImplementedError;
 
 class Mask {
     var className:String;
-    var tests:StringMap<Mask->Float->Float->Float->Float->Bool>;
+    var tests:Map<String, Mask->Float->Float->Float->Float->Bool>;
 
     public function new() {
         className = Type.getClassName(Type.getClass(this));
