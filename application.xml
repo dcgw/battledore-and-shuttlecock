@@ -6,30 +6,28 @@
   <haxedef name="fdb" if="target_flash" />
   <haxedef name="network-sandbox" if="target_flash"/>
 
-  <app file="battledore-and-shuttlecock"
-       title="Battledore and Shuttlecock"
+  <meta title="Battledore and Shuttlecock"
        package="net.noiseinstitute.battledore_and_shuttlecock"
        version="0"
-       company="Daniel Cassidy"
-       main="battledore_and_shuttlecock.Game"/>
+       company="Daniel Cassidy"/>
+
+  <app main="battledore_and_shuttlecock.Game" file="battledore-and-shuttlecock"/>
 
   <window width="${WIDTH}"
           height="${HEIGHT}"
           orientation="landscape"
           fps="60"
-          background="0x000000"
+          background="#000000"
           resizable="true"
-          hardware="false"/>
+          hardware="false"
+          vsync="true"/>
 
   <assets path="assets" include="*.mp3"/>
-    <assets path="assets" include="*.ttf"/>
+  <assets path="assets" include="*.ttf"/>
 
-  <classpath name="src"/>
-  <classpath name="lib/hopscotch/src"/>
-  <classpath name="lib/kong/src"/>
+  <source name="src"/>
+  <source name="lib/hopscotch/src"/>
+  <source name="lib/kong/src"/>
 
-  <haxelib name="nme"/>
-
-  <ndll name="std"/>
-  <ndll name="nme" haxelib="nme"/>
+  <haxelib name="openfl"/>
 </project>
