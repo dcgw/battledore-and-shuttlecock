@@ -4,6 +4,9 @@ package battledore_and_shuttlecock;
 import kong.KongregateApi;
 import kong.Kongregate;
 #end
+import flash.media.SoundChannel;
+import hopscotch.math.VectorMath;
+import flash.geom.Point;
 import hopscotch.math.Range;
 import flash.media.SoundTransform;
 import hopscotch.graphics.FontFace;
@@ -25,12 +28,20 @@ class Game extends Playfield {
     static inline var HEIGHT = 480;
     static inline var LOGIC_RATE = 60;
 
-    static inline var SHUTTLECOCK_START_SPEED = 4.0;
-    static inline var LIFT_ON_HIT = 4.0;
+    static inline var SHUTTLECOCK_START_SPEED = 8.0;
+
+    static inline var SPRINGINESS = 1;
+    static inline var HITTINESS = 1;
 
     static inline var MUSIC_VOLUME = 0.2;
+
     static inline var BIP_VOLUME = 0.2;
     static inline var BIP_PAN_AMOUNT = 0.2;
+
+    static inline var MIN_BIP_INTERVAL_FRAMES = 6;
+
+    static inline var MIN_BIP_VELOCITY_CHANGE = 2;
+    static inline var MAX_BIP_VELOCITY_CHANGE = 32;
 
     static inline var SCORE_SUBMIT_INTERVAL = 180;
 
@@ -52,13 +63,19 @@ class Game extends Playfield {
     var leftBattledore:Battledore;
     var rightBattledore:Battledore;
 
+    var lastScoringBattledore:Battledore;
+
     var shuttlecock:Shuttlecock;
     var net:Net;
+
+    var prevShuttlecockVelocity:Point;
 
     var musicPlaying:Bool;
 
     var bip:Sound;
+    var bipSoundChannel:SoundChannel;
     var bipSoundTransform:SoundTransform;
+    var lastBipFrame:Int;
 
     static function main () {
         #if flash
@@ -147,10 +164,12 @@ class Game extends Playfield {
         net.y = HEIGHT;
         addEntity(net);
 
+        prevShuttlecockVelocity = new Point();
+
         musicPlaying = false;
 
         bip = Assets.getSound("assets/bip.mp3");
-        bipSoundTransform = new SoundTransform(BIP_VOLUME);
+        bipSoundTransform = new SoundTransform();
     }
 
     override public function begin (frame:Int) {
@@ -176,6 +195,7 @@ class Game extends Playfield {
 
             shuttlecock.active = true;
 
+            lastScoringBattledore = null;
             updateScore(0);
 
             if (!musicPlaying) {
@@ -206,10 +226,8 @@ class Game extends Playfield {
     }
 
     function collideWithBattledore (battledore:Battledore) {
-        bipSoundTransform.pan = Range.clampFloat(0.5 + BIP_PAN_AMOUNT * (shuttlecock.x - WIDTH*0.5) / WIDTH, 0, 1);
-        bip.play(1, 0, bipSoundTransform);
-
-        updateScore(score + 1);
+        prevShuttlecockVelocity.x = shuttlecock.velocity.x;
+        prevShuttlecockVelocity.y = shuttlecock.velocity.y;
 
         if (shuttlecock.prevX > battledore.prevX) {
             var collideX = battledore.x + (Shuttlecock.WIDTH + Battledore.WIDTH) * 0.5 + 1;
@@ -217,7 +235,7 @@ class Game extends Playfield {
                 shuttlecock.x = collideX + collideX - shuttlecock.x;
             }
             if (shuttlecock.velocity.x < 0) {
-                shuttlecock.velocity.x = -shuttlecock.velocity.x;
+                shuttlecock.velocity.x = -SPRINGINESS * shuttlecock.velocity.x;
             }
         } else {
             var collideX = battledore.x - (Shuttlecock.WIDTH + Battledore.WIDTH) * 0.5 - 1;
@@ -225,12 +243,52 @@ class Game extends Playfield {
                 shuttlecock.x = collideX + collideX - shuttlecock.x;
             }
             if (shuttlecock.velocity.x > 0) {
-                shuttlecock.velocity.x = -shuttlecock.velocity.x;
+                shuttlecock.velocity.x = -SPRINGINESS * shuttlecock.velocity.x;
             }
         }
 
-        shuttlecock.velocity.x += battledore.velocity.x;
-        shuttlecock.velocity.y += battledore.velocity.y - LIFT_ON_HIT;
+        if ((battledore.velocity.x <= 0 && shuttlecock.velocity.x <= 0)
+                || (battledore.velocity.x >= 0 && shuttlecock.velocity.x >= 0)) {
+            if (Math.abs(battledore.velocity.x) > Math.abs(shuttlecock.velocity.x)) {
+                shuttlecock.velocity.x += HITTINESS * (battledore.velocity.x - shuttlecock.velocity.x);
+            }
+        } else {
+            shuttlecock.velocity.x += HITTINESS * battledore.velocity.x;
+        }
+
+        if ((battledore.velocity.y <= 0 && shuttlecock.velocity.y <= 0)
+                || (battledore.velocity.y >= 0 && shuttlecock.velocity.y >= 0)) {
+            if (Math.abs(battledore.velocity.y) > Math.abs(shuttlecock.velocity.y)) {
+                shuttlecock.velocity.y += HITTINESS * (battledore.velocity.y - shuttlecock.velocity.y);
+            }
+        } else {
+            shuttlecock.velocity.y += HITTINESS * battledore.velocity.y;
+        }
+
+        VectorMath.subtract(prevShuttlecockVelocity, shuttlecock.velocity);
+        var volume = VectorMath.magnitude(prevShuttlecockVelocity);
+        volume = (volume - MIN_BIP_VELOCITY_CHANGE) * (MAX_BIP_VELOCITY_CHANGE - MIN_BIP_VELOCITY_CHANGE);
+        volume = Range.clampFloat(volume, 0, 1);
+        volume *= BIP_VOLUME;
+
+        if (volume > 0) {
+            if (bipSoundChannel != null && lastBipFrame + MIN_BIP_INTERVAL_FRAMES > frame) {
+                if (volume > bipSoundChannel.soundTransform.volume) {
+                    bipSoundChannel.soundTransform.volume = volume;
+                    bipSoundChannel.soundTransform = bipSoundChannel.soundTransform;
+                }
+            } else {
+                bipSoundTransform.volume = volume;
+                bipSoundTransform.pan = Range.clampFloat(0.5 + BIP_PAN_AMOUNT * (shuttlecock.x - WIDTH*0.5) / WIDTH, 0, 1);
+                bipSoundChannel = bip.play(1, 0, bipSoundTransform);
+                lastBipFrame = frame;
+            }
+        }
+
+        if (battledore != lastScoringBattledore) {
+            updateScore(score + 1);
+            lastScoringBattledore = battledore;
+        }
     }
 
     function updateScore(score:Int) {
