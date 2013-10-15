@@ -1,7 +1,9 @@
 package battledore_and_shuttlecock;
 
+#if flash
 import kong.KongregateApi;
 import kong.Kongregate;
+#end
 import hopscotch.math.Range;
 import flash.media.SoundTransform;
 import hopscotch.graphics.FontFace;
@@ -34,7 +36,9 @@ class Game extends Playfield {
 
     var startButton:Button;
 
+    #if flash
     var kongregate:KongregateApi;
+    #end
 
     var score:Int;
     var submittedHighscore:Int;
@@ -73,19 +77,26 @@ class Game extends Playfield {
         var pointer = new Mouse(Lib.current.stage);
         engine.inputs.push(pointer);
 
+        #if flash
         Kongregate.loadApi(function(kongregate:KongregateApi) {
             kongregate.services.connect();
             engine.playfield = new Game(startButton, pointer, kongregate);
             engine.start();
         });
+        #else
+        engine.playfield = new Game(startButton, pointer);
+        engine.start();
+        #end
     }
 
-    public function new (startButton:Button, pointer:IPointer, kongregate:KongregateApi) {
+    public function new (startButton:Button, pointer:IPointer #if flash , kongregate:KongregateApi #end) {
         super();
 
         this.startButton = startButton;
 
+        #if flash
         this.kongregate = kongregate;
+        #end
 
         score = 0;
         submittedHighscore = 0;
@@ -231,7 +242,9 @@ class Game extends Playfield {
     inline function checkSubmitHighscore(forceSubmit=false) {
         if (forceSubmit || lastScoreSubmitFrame + SCORE_SUBMIT_INTERVAL <= frame ) {
             if (score > submittedHighscore) {
+                #if flash
                 kongregate.stats.submit("Highscore", score);
+                #end
                 submittedHighscore = score;
                 lastScoreSubmitFrame = frame;
             }
